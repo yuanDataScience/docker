@@ -1,0 +1,27 @@
+FROM python:3
+
+LABEL maintainer="Yuan Huang <huangyuan2000@hotmail.com>" \
+      version="1.0"
+
+RUN mkdir -p /01_data && \
+    mkdir -p /02_code && \
+    mkdir -p /03_output
+
+USER root
+
+COPY 02_code/requirements.txt /02_code/requirements.txt 
+
+RUN pip install awscli && mkdir /root/.aws 
+
+COPY 02_code/.aws /root/.aws
+RUN pip install -r /02_code/requirements.txt
+    
+WORKDIR /02_code
+
+COPY 02_code/upload_table.py /02_code/upload_table.py
+COPY 02_code/upload.sh /02_code/upload.sh
+COPY 02_code/dynamodbdataloader.py /02_code/dynamodbdataloader.py
+ENTRYPOINT ["upload.sh"]
+CMD []
+ENV PATH="/usr/bin:/02_code:${PATH}"
+ENV PYTHONPATH="/usr/local/lib/python3.7/site-packages"
