@@ -1,0 +1,49 @@
+# this python file convert the wide format file using the probe_ID and gene_symbol as the id columns, and multiple gsm columns
+(up to thousand different gsm columns) as variable column and the expression as the value column to 
+1. conver the wide format to long format txt file
+2. upload the converted long format txt file to the designated s3 folder
+
+import pandas as pd
+import boto3
+from io import StringIO
+import os
+import sys
+
+aws_access_key = os.getenv("AWS_ACCESS_KEY")
+aws_secret_access_key = os.getenv("AWS_SECRET_KEY")
+region = os.getenv("REGION")
+bucket_name = os.getenv("BUCKET")
+s3_path = os.getenv("S3_PATH")
+
+
+class wide_long_uploader():
+    def __init__(self, bucket, s3_path, aws_access_key, aws_secret_access_key, region):
+        self.bucket = bucket
+        self.s3_path = s3_path
+
+        self.session = boto3.Session(aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_access_key)
+        self.s3 = self.session.resource('s3', region)
+
+    def get_input_df(self, input_file):
+        self.input = input_file
+        df = pd.read_csv(input_file, sep="\t")
+        self.rs = pd.melt(df, id_vars=['probe_ID', 'gene_symbol'], var_name='gsm_number', value_name='expression')
+
+    def upload_df(self):
+        basename = os.path.basename(self.input)
+        buffer = StringIO()
+        self.rs.to_csv(buffer, sep="\t", index=False)
+        self.s3.Object(self.bucket, self.s3_path + basename).put(Body=buffer.getvalue())
+
+    def upload_file(self, input_file):
+        self.get_input_df(input_file)
+        self.upload_df()
+
+
+if __name__ == '__main__':
+    uploader = wide_long_uploader(bucket_name, s3_path, aws_access_key, aws_secret_access_key, region)
+    for filename in sys.argv[1:]:
+        try:
+            uploader.upload_file(filename)
+        except Exception as err:
+            print(err)
